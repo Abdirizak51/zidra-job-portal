@@ -3,7 +3,7 @@ const fs = require('fs');
 const { Application, Job, Company, User } = require('../models');
 const { sendEmail, emailTemplates } = require('../middlewares/email.service');
 
-// POST /api/applications/:jobId/apply - Applicant: apply for a job
+// POST /api/applications/:jobId/apply
 exports.applyForJob = async (req, res, next) => {
   try {
     if (!req.file) {
@@ -16,11 +16,10 @@ exports.applyForJob = async (req, res, next) => {
     });
 
     if (!job) {
-      fs.unlinkSync(req.file.path); // Clean up uploaded file
+      fs.unlinkSync(req.file.path);
       return res.status(404).json({ success: false, message: 'Job not found or not available.' });
     }
 
-    // Check if already applied
     const existingApp = await Application.findOne({
       where: { job_id: req.params.jobId, user_id: req.user.id }
     });
@@ -30,19 +29,19 @@ exports.applyForJob = async (req, res, next) => {
       return res.status(409).json({ success: false, message: 'You have already applied for this job.' });
     }
 
+    // SECURITY: Only store filename, not full path
     const application = await Application.create({
       job_id: req.params.jobId,
       user_id: req.user.id,
       cv_file_path: req.file.filename,
-      cover_letter: req.body.cover_letter || null,
+      cover_letter: req.body.cover_letter ? req.body.cover_letter.substring(0, 2000) : null,
       status: 'pending'
     });
 
-    // Send confirmation email (non-blocking)
     sendEmail(
       req.user.email,
       emailTemplates.applicationConfirmation(req.user.name, job.title, job.company.company_name)
-    ).catch(console.error);
+    ).catch(() => {});
 
     res.status(201).json({
       success: true,
@@ -51,13 +50,13 @@ exports.applyForJob = async (req, res, next) => {
     });
   } catch (error) {
     if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
     }
     next(error);
   }
 };
 
-// GET /api/applications/my - Applicant: get my applications
+// GET /api/applications/my
 exports.getMyApplications = async (req, res, next) => {
   try {
     const applications = await Application.findAll({
@@ -76,7 +75,7 @@ exports.getMyApplications = async (req, res, next) => {
   }
 };
 
-// PATCH /api/applications/:id/status - Employer: update application status
+// PATCH /api/applications/:id/status
 exports.updateApplicationStatus = async (req, res, next) => {
   try {
     const { status, employer_notes } = req.body;
@@ -97,25 +96,20 @@ exports.updateApplicationStatus = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Application not found.' });
     }
 
-    // Verify ownership
     const company = await Company.findOne({ where: { owner_id: req.user.id } });
     if (!company || application.job.company_id !== company.id) {
       return res.status(403).json({ success: false, message: 'Unauthorized.' });
     }
 
-    await application.update({ status, employer_notes: employer_notes || null });
+    // SECURITY: Sanitize employer notes
+    const safeNotes = employer_notes ? employer_notes.substring(0, 500) : null;
+    await application.update({ status, employer_notes: safeNotes });
 
-    // Send email notification for accepted/rejected
     if (status === 'accepted' || status === 'rejected') {
       sendEmail(
         application.applicant.email,
-        emailTemplates.applicationStatus(
-          application.applicant.name,
-          application.job.title,
-          status,
-          employer_notes
-        )
-      ).catch(console.error);
+        emailTemplates.applicationStatus(application.applicant.name, application.job.title, status, safeNotes)
+      ).catch(() => {});
     }
 
     res.json({ success: true, message: `Application ${status} successfully.`, data: { application } });
@@ -124,7 +118,7 @@ exports.updateApplicationStatus = async (req, res, next) => {
   }
 };
 
-// GET /api/applications/:id/download-cv - Employer: download CV
+// GET /api/applications/:id/download-cv
 exports.downloadCV = async (req, res, next) => {
   try {
     const application = await Application.findByPk(req.params.id, {
@@ -135,13 +129,25 @@ exports.downloadCV = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Application not found.' });
     }
 
-    // Verify employer owns the job
     const company = await Company.findOne({ where: { owner_id: req.user.id } });
     if (!company || application.job.company_id !== company.id) {
       return res.status(403).json({ success: false, message: 'Unauthorized.' });
     }
 
-    const cvPath = path.join(__dirname, '../uploads/cvs', application.cv_file_path);
+    // SECURITY: Prevent path traversal — validate filename strictly
+    const filename = application.cv_file_path;
+    if (!filename || /[\/\\]/.test(filename) || filename.includes('..') || !filename.endsWith('.pdf')) {
+      return res.status(400).json({ success: false, message: 'Invalid file reference.' });
+    }
+
+    const uploadDir = path.resolve(__dirname, '../uploads/cvs');
+    const cvPath = path.resolve(uploadDir, filename);
+
+    // Ensure resolved path stays inside uploads directory
+    if (!cvPath.startsWith(uploadDir)) {
+      return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
+
     if (!fs.existsSync(cvPath)) {
       return res.status(404).json({ success: false, message: 'CV file not found.' });
     }

@@ -94,10 +94,7 @@ const Login = () => {
             </p>
           </div>
 
-          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-            <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">Demo Admin Login:</p>
-            <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">Email: admin@zidra.com | Pass: Admin@1234</p>
-          </div>
+          
         </div>
       </div>
     </div>

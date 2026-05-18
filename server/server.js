@@ -85,15 +85,20 @@ app.use('/api/', globalLimiter);
 // SECURITY 4: CORS — Only allow frontend origin
 // ============================================================
 const allowedOrigins = [
-  process.env.CLIENT_URL || 'http://localhost:3000',
-  'http://localhost:3000'
-].filter(Boolean);
+  process.env.CLIENT_URL,
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:3000',
+].filter(Boolean).map(o => o.replace(/\/+$/, '')); // remove trailing slash
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, Postman)
+    // Allow requests with no origin (mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    const cleanOrigin = origin.replace(/\/+$/, '');
+    if (allowedOrigins.includes(cleanOrigin)) return callback(null, true);
+    // In development, allow all origins
+    if (process.env.NODE_ENV === 'development') return callback(null, true);
     callback(new Error('CORS: Origin not allowed'));
   },
   credentials: true,

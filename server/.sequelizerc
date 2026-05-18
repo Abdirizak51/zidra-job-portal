@@ -1,0 +1,11 @@
+const path = require('path');
+
+// Tani waxay CLI-ga ku qasbaysaa inuu marka hore ruro .env-ka kombiyuutarka
+require('dotenv').config();
+
+module.exports = {
+  'config': path.resolve('config', 'config.json'),
+  'models-path': path.resolve('models'),
+  'seeders-path': path.resolve('seeders'),
+  'migrations-path': path.resolve('migrations')
+};

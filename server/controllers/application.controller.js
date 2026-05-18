@@ -157,3 +157,26 @@ exports.downloadCV = async (req, res, next) => {
     next(error);
   }
 };
+
+// PATCH /api/applications/:id/shortlist - Employer: shortlist applicant
+exports.shortlistApplication = async (req, res, next) => {
+  try {
+    const application = await Application.findByPk(req.params.id, {
+      include: [{ model: Job, as: 'job', include: [{ model: Company, as: 'company' }] }]
+    });
+
+    if (!application) {
+      return res.status(404).json({ success: false, message: 'Application not found.' });
+    }
+
+    const company = await Company.findOne({ where: { owner_id: req.user.id } });
+    if (!company || application.job.company_id !== company.id) {
+      return res.status(403).json({ success: false, message: 'Unauthorized.' });
+    }
+
+    await application.update({ status: 'reviewing' });
+    res.json({ success: true, message: 'Applicant shortlisted!', data: { application } });
+  } catch (error) {
+    next(error);
+  }
+};

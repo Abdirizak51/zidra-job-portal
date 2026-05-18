@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -8,28 +8,32 @@ import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import LoadingSpinner from './components/common/LoadingSpinner';
 
-// Pages
+// Public pages
 import Home from './pages/public/Home';
 import Jobs from './pages/public/Jobs';
 import JobDetail from './pages/public/JobDetail';
-import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
 import { NotFound, ServerError } from './pages/public/ErrorPages';
 
-// Applicant
+// Auth pages
+import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
+
+// Applicant pages
 import ApplicantDashboard from './pages/applicant/Dashboard';
 import Profile from './pages/applicant/Profile';
 import AppliedJobs from './pages/applicant/AppliedJobs';
 import SavedJobs from './pages/applicant/SavedJobs';
 
-// Employer
+// Employer pages
 import EmployerDashboard from './pages/employer/Dashboard';
 import PostJob from './pages/employer/PostJob';
 import MyJobs from './pages/employer/MyJobs';
 import Applicants from './pages/employer/Applicants';
 import CompanyProfile from './pages/employer/CompanyProfile';
 
-// Admin
+// Admin pages
 import AdminDashboard from './pages/admin/Dashboard';
 import ManageUsers from './pages/admin/ManageUsers';
 import ManageJobs from './pages/admin/ManageJobs';
@@ -56,7 +60,7 @@ const App = () => {
             toastOptions={{
               duration: 4000,
               style: {
-                background: 'var(--toast-bg, #1f2937)',
+                background: '#1f2937',
                 color: '#f9fafb',
                 borderRadius: '12px',
                 fontSize: '14px',
@@ -67,15 +71,19 @@ const App = () => {
             }}
           />
           <Routes>
-            {/* Public routes */}
+            {/* ── Public ── */}
             <Route path="/" element={<Layout><Home /></Layout>} />
             <Route path="/jobs" element={<Layout><Jobs /></Layout>} />
             <Route path="/jobs/:id" element={<Layout><JobDetail /></Layout>} />
-            <Route path="/login" element={<Layout hideFooter><Login /></Layout>} />
-            <Route path="/register" element={<Layout hideFooter><Register /></Layout>} />
             <Route path="/500" element={<ServerError />} />
 
-            {/* Applicant routes */}
+            {/* ── Auth ── */}
+            <Route path="/login" element={<Layout hideFooter><Login /></Layout>} />
+            <Route path="/register" element={<Layout hideFooter><Register /></Layout>} />
+            <Route path="/forgot-password" element={<Layout hideFooter><ForgotPassword /></Layout>} />
+            <Route path="/reset-password" element={<Layout hideFooter><ResetPassword /></Layout>} />
+
+            {/* ── Applicant ── */}
             <Route path="/dashboard" element={
               <ProtectedRoute allowedRoles={['applicant']}>
                 <Layout hideFooter><ApplicantDashboard /></Layout>
@@ -97,7 +105,7 @@ const App = () => {
               </ProtectedRoute>
             } />
 
-            {/* Employer routes */}
+            {/* ── Employer ── */}
             <Route path="/employer/dashboard" element={
               <ProtectedRoute allowedRoles={['employer']}>
                 <Layout hideFooter><EmployerDashboard /></Layout>
@@ -124,7 +132,7 @@ const App = () => {
               </ProtectedRoute>
             } />
 
-            {/* Admin routes */}
+            {/* ── Admin ── */}
             <Route path="/admin/dashboard" element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <Layout hideFooter><AdminDashboard /></Layout>
@@ -146,7 +154,7 @@ const App = () => {
               </ProtectedRoute>
             } />
 
-            {/* Catch all */}
+            {/* ── 404 ── */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

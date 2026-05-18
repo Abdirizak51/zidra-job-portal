@@ -62,7 +62,12 @@ const Login = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
+                <Link to="/forgot-password" className="text-xs text-brand-600 hover:text-brand-700 font-medium transition-colors">
+                  Forgot password?
+                </Link>
+              </div>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'} name="password" value={form.password} onChange={handleChange} required
@@ -93,8 +98,6 @@ const Login = () => {
               <Link to="/register" className="text-brand-600 hover:text-brand-700 font-semibold">Create one free</Link>
             </p>
           </div>
-
-          
         </div>
       </div>
     </div>

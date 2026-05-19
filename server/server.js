@@ -89,24 +89,15 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'http://127.0.0.1:3000',
-].filter(Boolean).map(o => o.replace(/\/+$/, '')); // remove trailing slash
+].filter(Boolean).map(o => o.replace(/\/+$/, ''));
 
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, Postman)
-    if (!origin) return callback(null, true);
-    const cleanOrigin = origin.replace(/\/+$/, '');
-    if (allowedOrigins.includes(cleanOrigin)) return callback(null, true);
-    // In development, allow all origins
-    if (process.env.NODE_ENV === 'development') return callback(null, true);
-    callback(new Error('CORS: Origin not allowed'));
-  },
+  origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   maxAge: 86400
 }));
-
 // ============================================================
 // SECURITY 5: Body size limits — prevent large payload attacks
 // ============================================================

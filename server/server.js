@@ -3,175 +3,129 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const path = require('path');
 const rateLimit = require('express-rate-limit');
 const { sequelize } = require('./models');
 
-// ============================================================
-// SECURITY: Validate required environment variables on startup
-// ============================================================
+// ── Validate required env vars ────────────────────────────────
 const REQUIRED_ENV = ['JWT_SECRET'];
 REQUIRED_ENV.forEach(key => {
   if (!process.env[key]) {
-    console.error(`❌ FATAL: Missing required environment variable: ${key}`);
+    console.error(`❌ FATAL: Missing env var: ${key}`);
     process.exit(1);
   }
 });
 
-// Route imports
-const authRoutes = require('./routes/auth.routes');
-const userRoutes = require('./routes/user.routes');
-const companyRoutes = require('./routes/company.routes');
-const jobRoutes = require('./routes/job.routes');
+// ── Route imports ─────────────────────────────────────────────
+const authRoutes        = require('./routes/auth.routes');
+const userRoutes        = require('./routes/user.routes');
+const companyRoutes     = require('./routes/company.routes');
+const jobRoutes         = require('./routes/job.routes');
 const applicationRoutes = require('./routes/application.routes');
-const savedJobRoutes = require('./routes/savedJob.routes');
-const adminRoutes = require('./routes/admin.routes');
+const savedJobRoutes    = require('./routes/savedJob.routes');
+const adminRoutes       = require('./routes/admin.routes');
 
 const app = express();
 
-// ============================================================
-// SECURITY 1: Helmet — HTTP security headers
-// ============================================================
+// ── 1. Helmet security headers ────────────────────────────────
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:', 'https:'],
-    }
-  },
+  contentSecurityPolicy: false, // disabled — frontend handles CSP
   hsts: { maxAge: 31536000, includeSubDomains: true },
   noSniff: true,
-  xssFilter: true,
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
 }));
-
-// ============================================================
-// SECURITY 2: Hide server info
-// ============================================================
 app.disable('x-powered-by');
 
-// ============================================================
-// SECURITY 3: Rate Limiting — DDoS & Brute Force protection
-// ============================================================
+// ── 2. Rate limiting ──────────────────────────────────────────
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: 'Too many requests. Please try again later.' },
-  skip: (req) => req.ip === '127.0.0.1'
+  message: { success: false, message: 'Too many requests. Try again later.' }
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10, // Stricter: 10 attempts per 15 min
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: 'Too many login attempts. Please try again in 15 minutes.' }
+  message: { success: false, message: 'Too many attempts. Try again in 15 minutes.' }
 });
 
 const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 20, // Max 20 uploads per hour
+  max: 20,
   message: { success: false, message: 'Upload limit reached. Try again in an hour.' }
 });
 
 app.use('/api/', globalLimiter);
 
-// ============================================================
-// SECURITY 4: CORS — Only allow frontend origin
-// ============================================================
-const allowedOrigins = [
-  process.env.CLIENT_URL,
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://127.0.0.1:3000',
-].filter(Boolean).map(o => o.replace(/\/+$/, ''));
-
+// ── 3. CORS — allow all origins (Somalia + worldwide) ─────────
+// JWT handles security — CORS just prevents browser blocks
 app.use(cors({
-  origin: true,
+  origin: true,           // allow ALL origins worldwide
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  maxAge: 86400
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200 // fix for older browsers/mobile
 }));
-// ============================================================
-// SECURITY 5: Body size limits — prevent large payload attacks
-// ============================================================
-app.use(express.json({ limit: '1mb' }));         // Reduced from 10mb
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// ============================================================
-// SECURITY 6: Logging (no sensitive data in production)
-// ============================================================
+// Handle preflight requests explicitly
+app.options('*', cors());
+
+// ── 4. Body parsing ───────────────────────────────────────────
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+
+// ── 5. Logging ────────────────────────────────────────────────
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 } else {
   app.use(morgan('combined', {
-    skip: (req, res) => res.statusCode < 400 // Only log errors in production
+    skip: (req, res) => res.statusCode < 400
   }));
 }
 
-// ============================================================
-// SECURITY 7: Static files — NO directory listing, auth required
-// ============================================================
-// CVs are NOT served statically — only via authenticated /download-cv endpoint
-// This prevents unauthenticated access to uploaded CVs
-
-// ============================================================
-// API Routes
-// ============================================================
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/companies', companyRoutes);
-app.use('/api/jobs', jobRoutes);
+// ── 6. API Routes ─────────────────────────────────────────────
+app.use('/api/auth',         authLimiter,   authRoutes);
+app.use('/api/users',                       userRoutes);
+app.use('/api/companies',                   companyRoutes);
+app.use('/api/jobs',                        jobRoutes);
 app.use('/api/applications', uploadLimiter, applicationRoutes);
-app.use('/api/saved-jobs', savedJobRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/saved-jobs',                  savedJobRoutes);
+app.use('/api/admin',                       adminRoutes);
 
-// Health check — no sensitive info exposed
+// ── Health check ──────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
-  res.json({ success: true, status: 'ok' });
+  res.json({
+    success: true,
+    status: 'ok',
+    timestamp: new Date().toISOString()
+  });
 });
 
-// ============================================================
-// SECURITY 8: Block all unknown routes (no info leakage)
-// ============================================================
+// ── 404 handler ───────────────────────────────────────────────
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Not found.' });
+  res.status(404).json({ success: false, message: 'Route not found.' });
 });
 
-// ============================================================
-// SECURITY 9: Global error handler — never leak stack traces
-// ============================================================
+// ── Global error handler ──────────────────────────────────────
 app.use((err, req, res, next) => {
-  // Log full error server-side only
   console.error(`[ERROR] ${new Date().toISOString()} ${req.method} ${req.path}:`, err.message);
 
-  // CORS errors
-  if (err.message && err.message.includes('CORS')) {
-    return res.status(403).json({ success: false, message: 'Access denied.' });
-  }
-
   const statusCode = err.statusCode || 500;
-
-  // Never expose stack traces or internal errors to client in production
   res.status(statusCode).json({
     success: false,
     message: process.env.NODE_ENV === 'development'
       ? err.message
-      : statusCode === 500 ? 'Internal server error.' : err.message
+      : statusCode >= 500 ? 'Internal server error.' : err.message
   });
 });
 
+// ── Start server ──────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 
-// ============================================================
-// Start Server
-// ============================================================
 const startServer = async () => {
   try {
     await sequelize.authenticate();
@@ -184,7 +138,8 @@ const startServer = async () => {
 
     app.listen(PORT, () => {
       console.log(`🚀 Zidra Server running on port ${PORT}`);
-      console.log(`🔒 Security: Helmet, Rate Limiting, CORS, Input Validation enabled`);
+      console.log(`🔒 Security: Helmet, Rate Limiting, JWT enabled`);
+      console.log(`🌍 CORS: Open for all origins`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error.message);
@@ -192,22 +147,19 @@ const startServer = async () => {
   }
 };
 
-// ============================================================
-// SECURITY: Default admin password from env variable
-// ============================================================
 const createDefaultAdmin = async () => {
   const { User } = require('./models');
-  const bcrypt = require('bcryptjs');
+  const bcrypt   = require('bcryptjs');
 
   const adminExists = await User.findOne({ where: { role: 'admin' } });
   if (!adminExists) {
     const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@1234';
     const hashedPassword = await bcrypt.hash(adminPassword, 12);
     await User.create({
-      name: 'Zidra Admin',
-      email: process.env.ADMIN_EMAIL || 'admin@zidra.com',
+      name:     'Zidra Admin',
+      email:    process.env.ADMIN_EMAIL || 'admin@zidra.com',
       password: hashedPassword,
-      role: 'admin',
+      role:     'admin',
       is_active: true
     });
     console.log('✅ Default admin account created');

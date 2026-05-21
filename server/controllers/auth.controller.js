@@ -145,7 +145,7 @@ exports.changePassword = async (req, res, next) => {
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ success: false, message: 'Both passwords are required.' });
     }
-    if (newPassword.length < 8 || newPassword.length > 128) {
+    if (newPassword.length < 6 || newPassword.length > 128) {
       return res.status(400).json({ success: false, message: 'New password must be 8-128 characters.' });
     }
     if (currentPassword === newPassword) {

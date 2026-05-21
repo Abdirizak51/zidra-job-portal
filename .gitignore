@@ -2,15 +2,16 @@
 node_modules/
 */node_modules/
 
-# Environment variables
-.env
+# Server environment (keep secret)
 server/.env
-client/.env
 
-# Build output
+# Client .env is NOT ignored — Vercel needs it
+# client/.env  ← DO NOT ignore this
+
+# Build
 client/build/
 
-# Uploads (user files)
+# Uploads
 server/uploads/cvs/*
 !server/uploads/cvs/.gitkeep
 
@@ -25,7 +26,3 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
-*.swp
-
-# Coverage
-coverage/
